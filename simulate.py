@@ -1,93 +1,134 @@
 import numpy as np
 import time
 import pygame
+import random
 
 grid = []
 
-starting_config = []
-state = []
-rows = 10
-columns = 10
+# starting_points = []
+node_neighbor = []
+rows = 100
+columns = 100
+
 
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 GREEN = (0, 255, 0)
 BLUE = (0, 0, 255)
-WIDTH = 25
-HEIGHT = 25
+WIDTH = 8
+HEIGHT = 8
 MARGIN = 1
 
 grid = np.zeros((rows, columns))
 
-def start_simulation(iterations):
-    # make a copy of the grid so changes can be made
-    steps = 0
-    amount_of_live_neighbors = 0
+def initilize(max):
+    random.seed()
+    return [ ( random.randint(3, rows-3), random.randint(3, rows-3) ) for k in range(max) ]
+
+
+# finding neighbors for a given cell
+# this function takes the current grid and and find the neighors of the live cells as a tupil
+def find_neighbors(grid, starting_points):
     current_grid = grid[:]
+    for row in range(grid.shape[0]-1):
+        for column in range(grid.shape[0]-1):
+            get_neighbors(row, column, current_grid)
 
-    while steps < iterations:
-        for origin_row in range(0, rows - 1):
-            for origin_column in range(0, columns - 1):
-                # find neighbors of current cell and determine if it will live or die
-                if origin_row == 0:
+def get_neighbors(rw, col, cg):
+    if not rw and not col:
+        neighbors = (rw + 1, col), (rw , col + 1), (rw + 1 , col + 1)
+    elif rw == 0:
+        neighbors = (rw, col + 1), (rw , col - 1), (rw + 1 , col)
+    elif col == 0:
+        neighbors = (rw + 1, col), (rw - 1, col), (rw , col + 1)
+    else:
+        neighbors = (rw + 1, col), (rw - 1, col), (rw , col + 1), (rw , col - 1), (rw + 1, col + 1), (rw - 1, col - 1), (rw + 1, col - 1), (rw - 1, col + 1)
 
-                    neighbors = (origin_row + 1, origin_column), (origin_row , origin_column + 1), (origin_row , origin_column - 1), (origin_row + 1, origin_column + 1)
-                elif origin_column == 0:
-                    neighbors = (origin_row + 1, origin_column), (origin_row - 1, origin_column), (origin_row , origin_column + 1), (origin_row + 1, origin_column + 1)
-                else:
-                # print(neighbors)
-                    neighbors = (origin_row + 1, origin_column), (origin_row - 1, origin_column), (origin_row , origin_column + 1), (origin_row , origin_column - 1), (origin_row + 1, origin_column + 1), (origin_row - 1, origin_column - 1), (origin_row + 1, origin_column - 1), (origin_row - 1, origin_column + 1)
-                for neighbor in neighbors:
-                    if current_grid[neighbor[0]][neighbor[1]] == 1:
-                        amount_of_live_neighbors = amount_of_live_neighbors + 1
-                print((origin_row, origin_column) , amount_of_live_neighbors)
-                amount_of_live_neighbors = 0
-        steps = steps + 1
-pygame.init()
-WINDOW_SIZE = [HEIGHT*columns+columns*MARGIN, HEIGHT*rows+rows*MARGIN]
-screen = pygame.display.set_mode(WINDOW_SIZE)
-screen.fill(BLACK)
+    amt = 0
+    for n in neighbors:
+        if cg[n[0]][n[1]] == 1:
+            amt = amt + 1
+    node_neighbor.append(((rw, col), amt))
+    # print(neighbors)
 
-"""Draw the grid to be used"""
-
-for row in range(0, rows):
-    for column in range(0, columns):
-        pygame.draw.rect(screen,
-                         WHITE,
-                         [(MARGIN + WIDTH) * row + MARGIN,
-                          (MARGIN + HEIGHT) * column + MARGIN,
-                          WIDTH,
-                          HEIGHT])
-pygame.display.flip()
+def generation(node_neighbor, g):
+    next_generation = g[:]
+    for i in range(0, len(node_neighbor)):
+        node, amount_of_neighbors = node_neighbor[i]
 
 
-print('++++++++++++++++++++++++++')
-print('After entering starting conditions then enter to start')
-print('++++++++++++++++++++++++++')
-running = True
-while running:
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.KEYUP:
-            start_simulation(1)
+        # death by isolation
+        if amount_of_neighbors <= 1 and g[node[0]][node[1]] == 1:
+            next_generation[node[0]][node[1]] = 0
 
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            pos = pygame.mouse.get_pos()
-            r = int(pos[0] / (MARGIN + WIDTH))
-            c = int(pos[1] / (MARGIN + HEIGHT))
-            grid[c][r] = 1
+            # case of death by over crowding
+        elif amount_of_neighbors >= 4 and g[node[0]][node[1]] == 1:
+            next_generation[node[0]][node[1]] = 0
+
+            # case of survival
+        elif (amount_of_neighbors in range(2, 4)) and g[node[0]][node[1]] == 1:
+            next_generation[node[0]][node[1]] = 1
+
+        elif amount_of_neighbors == 3 and g[node[0]][node[1]] == 0:
+            next_generation[node[0]][node[1]] = 1
+
+    # print(next_generation)
 
 
-    for row in range(0, rows):
-        for column in range(0, columns):
-            if grid[row][column] == 1:
-                color = RED
+
+# this function takes the starting config and populate the grid with the first few automatas
+def populate(starting_points, grid):
+    for i in range(0, len(starting_points)):
+        x, y = starting_points[i]
+        grid[x][y] = 1
+    # print(grid)
+    return grid
+
+
+def drawgrid(g):
+    pygame.init()
+    WINDOW_SIZE = [HEIGHT*columns+columns*MARGIN, HEIGHT*rows+rows*MARGIN]
+    screen = pygame.display.set_mode(WINDOW_SIZE)
+    screen.fill(BLACK)
+
+    """Draw the grid to be used"""
+
+    for row in range(0, g.shape[0]):
+        for column in range(0, g.shape[0]):
+            if g[row][column] == 1:
                 pygame.draw.rect(screen,
-                                 color,
-                                 [(MARGIN + WIDTH) * column + MARGIN,
-                                  (MARGIN + HEIGHT) * row + MARGIN,
+                                 RED,
+                                 [(MARGIN + WIDTH) * row + MARGIN,
+                                  (MARGIN + HEIGHT) * column + MARGIN,
                                   WIDTH,
                                   HEIGHT])
-                pygame.display.flip()
+            else:
+                pygame.draw.rect(screen,
+                                 WHITE,
+                                 [(MARGIN + WIDTH) * row + MARGIN,
+                                  (MARGIN + HEIGHT) * column + MARGIN,
+                                  WIDTH,
+                                  HEIGHT])
+    pygame.display.flip()
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            break
+        break
+
+if __name__ == '__main__':
+    starting_points = initilize(5000)
+    print(starting_points)
+    staring_condition = populate(starting_points, grid)
+    drawgrid(grid)
+    while 1:
+        find_neighbors(staring_condition, starting_points)
+        time.sleep(.1)
+        generation(node_neighbor, grid)
+        drawgrid(grid)
+    # print(node_neighbor)
+    # get_neighbors(0, 1)
